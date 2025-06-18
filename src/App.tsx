@@ -5,7 +5,7 @@ import { Login } from './pages/Login';
 import { Home } from './pages/Home';
 import { Messages } from './pages/Messages';
 import { Wallet } from './pages/Wallet';
-// import { Search } from './pages/Search';
+import { Search } from './pages/Search';
 import { Profile } from './pages/Profile';
 import { supabase } from './lib/supabase';
 
@@ -30,50 +30,89 @@ export function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Check for existing authentication
     const checkAuth = async () => {
       try {
         console.log('Checking authentication status...');
-        const { data: { session } } = await supabase.auth.getSession();
+        
+        // Check Supabase session
+        const { data: { session }, error } = await supabase.auth.getSession();
         const storedAddress = localStorage.getItem('walletAddress');
         const storedAuth = localStorage.getItem('isAuthenticated');
         const storedUserType = localStorage.getItem('userType') as 'metamask' | 'email' | null;
-
+        
+        console.log('Auth check results:', { 
+          hasSession: !!session, 
+          storedAddress, 
+          storedAuth,
+          storedUserType,
+          sessionUser: session?.user?.id 
+        });
+        
         if (session && storedAuth === 'true' && storedAddress && storedUserType) {
+          // Valid session and stored credentials
           setIsAuthenticated(true);
           setWalletAddress(storedAddress);
           setUserType(storedUserType);
+          console.log('User authenticated with session and stored address:', storedAddress, 'type:', storedUserType);
         } else if (storedAuth === 'true' && storedAddress && storedUserType) {
+          // Has stored auth but no session - try to restore
+          console.log('Has stored auth but no session, attempting to restore...');
+          
+          // Try to authenticate based on user type
+          let email: string;
+          let password: string;
+
           if (storedUserType === 'email') {
+            // For email users, we need to get their actual email from the stored address
+            // This is a limitation - in production, you'd store the email separately
             console.log('Cannot restore email user session without stored email');
-            localStorage.clear();
+            localStorage.removeItem('isAuthenticated');
+            localStorage.removeItem('walletAddress');
+            localStorage.removeItem('userType');
             setIsAuthenticated(false);
             setWalletAddress(null);
             setUserType(null);
           } else {
-            const email = `${storedAddress}@kraken.web3`;
-            const password = `kraken_${storedAddress}_secure_2025`;
-            const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-
+            // For MetaMask users, use the deterministic email/password
+            email = `${storedAddress}@kraken.web3`;
+            password = `kraken_${storedAddress}_secure_2025`;
+            
+            const { data, error: signInError } = await supabase.auth.signInWithPassword({
+              email,
+              password,
+            });
+            
             if (!signInError && data.session) {
               setIsAuthenticated(true);
               setWalletAddress(storedAddress);
               setUserType(storedUserType);
+              console.log('Successfully restored session for:', storedAddress);
             } else {
-              localStorage.clear();
+              console.log('Failed to restore session, clearing stored auth');
+              localStorage.removeItem('isAuthenticated');
+              localStorage.removeItem('walletAddress');
+              localStorage.removeItem('userType');
               setIsAuthenticated(false);
               setWalletAddress(null);
               setUserType(null);
             }
           }
         } else {
-          localStorage.clear();
+          // No valid authentication
+          console.log('No valid authentication found');
+          localStorage.removeItem('isAuthenticated');
+          localStorage.removeItem('walletAddress');
+          localStorage.removeItem('userType');
           setIsAuthenticated(false);
           setWalletAddress(null);
           setUserType(null);
         }
       } catch (error) {
         console.error('Error checking authentication:', error);
-        localStorage.clear();
+        localStorage.removeItem('isAuthenticated');
+        localStorage.removeItem('walletAddress');
+        localStorage.removeItem('userType');
         setIsAuthenticated(false);
         setWalletAddress(null);
         setUserType(null);
@@ -84,7 +123,10 @@ export function App() {
 
     checkAuth();
 
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, !!session);
+      
       if (event === 'SIGNED_IN' && session) {
         const storedAddress = localStorage.getItem('walletAddress');
         const storedUserType = localStorage.getItem('userType') as 'metamask' | 'email' | null;
@@ -92,9 +134,13 @@ export function App() {
           setIsAuthenticated(true);
           setWalletAddress(storedAddress);
           setUserType(storedUserType);
+          console.log('Auth state: signed in with address:', storedAddress, 'type:', storedUserType);
         }
       } else if (event === 'SIGNED_OUT') {
-        localStorage.clear();
+        console.log('Auth state: signed out');
+        localStorage.removeItem('isAuthenticated');
+        localStorage.removeItem('walletAddress');
+        localStorage.removeItem('userType');
         setIsAuthenticated(false);
         setWalletAddress(null);
         setUserType(null);
@@ -107,18 +153,27 @@ export function App() {
   }, []);
 
   const logout = async () => {
+    console.log('Logging out user');
+    
     try {
+      // Sign out from Supabase
       await supabase.auth.signOut();
     } catch (error) {
       console.error('Error signing out from Supabase:', error);
     }
-
-    localStorage.clear();
+    
+    // Clear local storage
+    localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('walletAddress');
+    localStorage.removeItem('userType');
+    
+    // Update state
     setIsAuthenticated(false);
     setWalletAddress(null);
     setUserType(null);
   };
 
+  // Show loading spinner while checking authentication
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
@@ -134,19 +189,24 @@ export function App() {
     <AuthContext.Provider value={{ isAuthenticated, walletAddress, userType, logout }}>
       <BrowserRouter>
         <Routes>
-          <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/" replace />} />
-          <Route path="/" element={isAuthenticated ? <Layout /> : <Navigate to="/login" replace />}>
+          <Route
+            path="/login"
+            element={!isAuthenticated ? <Login /> : <Navigate to="/" replace />}
+          />
+          <Route
+            path="/"
+            element={isAuthenticated ? <Layout /> : <Navigate to="/login" replace />}
+          >
             <Route index element={<Home />} />
             <Route path="messages" element={<Messages />} />
-            {/* <Route path="search" element={<Search />} /> */}
+            <Route path="search" element={<Search />} />
             <Route path="wallet" element={<Wallet />} />
             <Route path="profile" element={<Profile />} />
           </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthContext.Provider>
   );
 }
 
-export default App;
+export default App

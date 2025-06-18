@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Loader2, ArrowLeft, AlertCircle, MessageCircle, Zap, Shield, ShieldOff, Lock, Unlock } from 'lucide-react';
+import { Send, Loader2, ArrowLeft, AlertCircle, Plus, Users, Clock, CheckCircle, MessageCircle, Zap, Shield, ShieldOff, Lock, Unlock } from 'lucide-react';
+import { shortenAddress } from '../lib/web3';
 import { useContext } from 'react';
 import { AuthContext } from '../App';
 import { messagingService, type Message } from '../lib/messagingService';
@@ -24,6 +25,7 @@ export function Messages() {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [connectionStatus, setConnectionStatus] = useState({ gun: false });
+  const [recipientStatus, setRecipientStatus] = useState<'unknown' | 'online' | 'offline'>('unknown');
   const [encryptionEnabled, setEncryptionEnabled] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { walletAddress } = useContext(AuthContext);
@@ -41,6 +43,23 @@ export function Messages() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    // Check recipient status when recipient changes
+    if (recipient) {
+      checkRecipientStatus();
+    }
+  }, [recipient, onlineUsers]);
+
+  const checkRecipientStatus = () => {
+    if (!recipient) {
+      setRecipientStatus('unknown');
+      return;
+    }
+
+    const isRecipientOnline = onlineUsers.includes(recipient.toLowerCase());
+    setRecipientStatus(isRecipientOnline ? 'online' : 'offline');
+  };
 
   const initializeMessaging = async () => {
     if (!walletAddress) return;
@@ -206,6 +225,7 @@ export function Messages() {
     setSelectedConversation(null);
     setRecipient('');
     setShowRecipient(true);
+    setRecipientStatus('unknown');
   };
 
   const getStatusIcon = (status: string) => {
@@ -213,9 +233,9 @@ export function Messages() {
       case 'sending':
         return <Loader2 className="w-3 h-3 animate-spin opacity-60" />;
       case 'sent':
-        return <div className="w-3 h-3 rounded-full bg-blue-400 opacity-60" />;
+        return <CheckCircle className="w-3 h-3 text-blue-400 opacity-60" />;
       case 'delivered':
-        return <div className="w-3 h-3 rounded-full bg-green-400 opacity-60" />;
+        return <CheckCircle className="w-3 h-3 text-green-400 opacity-60" />;
       case 'pending_decryption':
         return <Loader2 className="w-3 h-3 animate-spin text-yellow-400 opacity-60" />;
       case 'failed':
@@ -233,16 +253,32 @@ export function Messages() {
     );
   };
 
-  const getConnectionStatusIcon = () => {
-    if (connectionStatus.gun) {
-      return <Zap className="w-4 h-4 text-green-500" title="Gun.js P2P Connected" />;
-    } else {
-      return <Zap className="w-4 h-4 text-red-500" title="Disconnected" />;
+  const getRecipientStatusIndicator = () => {
+    switch (recipientStatus) {
+      case 'online':
+        return (
+          <div className="flex items-center space-x-1 text-xs text-green-400">
+            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+          </div>
+        );
+      case 'offline':
+        return (
+          <div className="flex items-center space-x-1 text-xs text-yellow-400">
+            <Clock className="w-3 h-3" />
+            <span>Offline - will deliver when online</span>
+          </div>
+        );
+      default:
+        return null;
     }
   };
 
-  const shortenAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  const getConnectionStatusIcon = () => {
+    if (connectionStatus.gun) {
+      return <Zap className="w-4 h-4 text-green-500" title="Gun.js P2P" />;
+    } else {
+      return <Zap className="w-4 h-4 text-red-500" title="Disconnected" />;
+    }
   };
 
   if (!walletAddress) {
@@ -262,7 +298,7 @@ export function Messages() {
         <div className="text-center space-y-4">
           <Loader2 className="w-8 h-8 mx-auto animate-spin text-blue-500" />
           <p className="text-gray-400">Initializing messaging system...</p>
-          <p className="text-sm text-gray-500">Connecting to Gun.js network</p>
+          <p className="text-sm text-gray-500">Discovering Gun.js peers and setting up connections</p>
         </div>
       </div>
     );
@@ -305,18 +341,16 @@ export function Messages() {
             <h1 className="text-xl font-semibold text-white">Messages</h1>
             <button
               onClick={handleNewMessage}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg text-sm transition-colors"
+              className="p-2 hover:bg-zinc-700 rounded-full transition-colors text-zinc-400 hover:text-white"
+              title="New Message"
             >
-              New
+              <Plus className="w-5 h-5" />
             </button>
           </div>
           
-          {/* Connection Status */}
-          <div className="flex items-center space-x-2 text-sm text-zinc-400">
-            {getConnectionStatusIcon()}
-            <span>{connectionStatus.gun ? 'Connected' : 'Connecting...'}</span>
-            <span>•</span>
-            <span>{onlineUsers.length} online</span>
+          {/* Online Users Count */}
+          <div className="text-sm text-zinc-400">
+            {onlineUsers.length} users online
           </div>
         </div>
 
@@ -326,7 +360,7 @@ export function Messages() {
             <div className="flex flex-col items-center justify-center h-full text-center p-8">
               <MessageCircle className="w-12 h-12 text-zinc-600 mb-4" />
               <h3 className="text-lg font-medium text-zinc-400 mb-2">No conversations yet</h3>
-              <p className="text-sm text-zinc-500">Start a new conversation by clicking "New" above</p>
+              <p className="text-sm text-zinc-500">Start a new conversation by clicking the + button above</p>
             </div>
           ) : (
             conversations.map((conversation) => (
@@ -339,14 +373,21 @@ export function Messages() {
               >
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 bg-zinc-700 rounded-full flex items-center justify-center">
-                    <span className="text-sm text-zinc-300">
-                      {conversation.participants.find(p => p !== walletAddress?.toLowerCase())?.slice(2, 4).toUpperCase()}
-                    </span>
+                    {conversation.is_group ? (
+                      <Users className="w-5 h-5 text-zinc-300" />
+                    ) : (
+                      <span className="text-sm text-zinc-300">
+                        {conversation.participants.find(p => p !== walletAddress?.toLowerCase())?.slice(2, 4).toUpperCase()}
+                      </span>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center space-x-2">
                       <h3 className="font-medium text-white truncate">
-                        {shortenAddress(conversation.participants.find(p => p !== walletAddress?.toLowerCase()) || '')}
+                        {conversation.is_group 
+                          ? conversation.group_name || 'Group Chat'
+                          : shortenAddress(conversation.participants.find(p => p !== walletAddress?.toLowerCase()) || '')
+                        }
                       </h3>
                       {onlineUsers.includes(conversation.participants.find(p => p !== walletAddress?.toLowerCase()) || '') && (
                         <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
@@ -399,6 +440,9 @@ export function Messages() {
                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                   )}
                 </div>
+                <div className="flex items-center space-x-4 text-sm text-gray-500">
+                  {getRecipientStatusIndicator()}
+                </div>
               </div>
               <button
                 onClick={() => setEncryptionEnabled(!encryptionEnabled)}
@@ -422,7 +466,7 @@ export function Messages() {
               <MessageCircle className="w-16 h-16 text-zinc-600 mb-4" />
               <h3 className="text-lg font-medium text-zinc-400 mb-2">No messages yet</h3>
               <p className="text-sm text-zinc-500">
-                Send your first {encryptionEnabled ? 'encrypted' : 'unencrypted'} message!
+                Send your first {encryptionEnabled ? 'encrypted' : 'unencrypted'} message via Gun.js P2P network!
               </p>
             </div>
           ) : (
@@ -465,9 +509,10 @@ export function Messages() {
                 type="text"
                 value={recipient}
                 onChange={(e) => setRecipient(e.target.value)}
-                placeholder="Enter wallet address (0x...)"
+                placeholder="Enter Ethereum address (0x...)"
                 className="w-full bg-zinc-900 rounded-xl py-3 px-4 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+              {recipient && getRecipientStatusIndicator()}
             </div>
           )}
           <div className="flex space-x-2">
@@ -493,6 +538,19 @@ export function Messages() {
                 <Send className="w-5 h-5" />
               )}
             </button>
+          </div>
+          <div className="flex items-center justify-between mt-2">
+            <div className="flex items-center space-x-4 text-xs text-zinc-400">
+              {!connectionStatus.gun && (
+                <span className="text-red-400">No connections available</span>
+              )}
+              {recipientStatus === 'offline' && (
+                <span className="text-yellow-400">Recipient offline - message will be delivered when they come online</span>
+              )}
+            </div>
+            <div className="flex items-center space-x-2 text-xs text-zinc-500">
+              {getConnectionStatusIcon()}
+            </div>
           </div>
         </form>
       </div>

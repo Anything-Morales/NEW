@@ -5,7 +5,7 @@ import { Login } from './pages/Login';
 import { Home } from './pages/Home';
 import { Messages } from './pages/Messages';
 import { Wallet } from './pages/Wallet';
-import { Search } from './pages/Search';
+//import { Search } from './pages/Search';
 import { Profile } from './pages/Profile';
 import { supabase } from './lib/supabase';
 

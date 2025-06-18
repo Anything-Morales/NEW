@@ -12,7 +12,7 @@ export interface Message {
   status: 'sending' | 'sent' | 'delivered' | 'failed' | 'pending_decryption';
   transport: 'gun';
   encrypted: boolean;
-  decrypted?: boolean; // Flag to indicate if message was successfully decrypted
+  decrypted?: boolean;
 }
 
 export interface MessageCallback {
@@ -37,7 +37,6 @@ interface SharedKeyInfo {
 
 class MessagingService {
   private gun: any;
-  private sea: any;
   private messageCallbacks: MessageCallback[] = [];
   private presenceCallbacks: PresenceCallback[] = [];
   private isInitialized = false;
@@ -560,112 +559,32 @@ class MessagingService {
   }
 
   private async discoverLivePeers(): Promise<void> {
-    console.log('Discovering live Gun.js peers using Gun relay...');
+    console.log('Discovering live Gun.js peers...');
     
-    // Enhanced list of Gun.js relay servers and public peers
+    // Curated list of reliable Gun.js relay servers
     const knownPeers = [
-      // Primary Gun relay servers
-      'https://gun-manhattan.herokuapp.com/gun',
-      'https://gun-us.herokuapp.com/gun',
-      'https://gun-eu.herokuapp.com/gun',
-      'https://gunjs.herokuapp.com/gun',
-      
-      // Alternative relay servers
-      'https://gun-manhattan.onrender.com/gun',
-      'https://gun-relay.herokuapp.com/gun',
-      'https://gun-relay.onrender.com/gun',
-      
-      // Community peers
-      'https://peer.wallie.io/gun',
-      'https://gun.eco/gun',
-      'https://gundb.io/gun',
-      
-      // WebSocket peers
-      'wss://gun-manhattan.herokuapp.com/gun',
-      'wss://gun-us.herokuapp.com/gun',
-      'wss://gunjs.herokuapp.com/gun',
-      'wss://gun-relay.herokuapp.com/gun',
-      
-      // Additional relay servers
-      'https://gun-relay-1.herokuapp.com/gun',
-      'https://gun-relay-2.herokuapp.com/gun',
-      'https://gun-relay-3.herokuapp.com/gun',
-      'https://gun-relay-4.herokuapp.com/gun',
-      'https://gun-relay-5.herokuapp.com/gun',
-      
-      // More community peers
-      'https://gun.iris.to/gun',
-      'https://gun-relay.iris.to/gun',
-      'https://relay.gun.eco/gun'
-    ];
-
-    const livePeers: string[] = [];
-    
-    // Test each peer for availability with improved detection
-    const testPromises = knownPeers.map(async (peer) => {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // Increased timeout
-        
-        // Try to fetch the peer endpoint
-        const response = await fetch(peer.replace('/gun', '/'), {
-          method: 'HEAD',
-          signal: controller.signal,
-          mode: 'no-cors' // Allow cross-origin requests
-        });
-        
-        clearTimeout(timeoutId);
-        
-        // Accept any response (including CORS errors) as a sign the server is alive
-        livePeers.push(peer);
-        console.log('Live peer found:', peer);
-        
-      } catch (error) {
-        // For no-cors mode, network errors might still indicate a live server
-        if (error.name !== 'AbortError') {
-          // Try the peer anyway as it might be a CORS issue
-          livePeers.push(peer);
-          console.log('Peer added despite error (might be CORS):', peer);
-        } else {
-          console.log('Peer timeout:', peer);
-        }
-      }
-    });
-
-    await Promise.allSettled(testPromises);
-    
-    // Always include some fallback peers even if tests fail
-    const fallbackPeers = [
       'https://gun-manhattan.herokuapp.com/gun',
       'https://gun-us.herokuapp.com/gun',
       'https://gunjs.herokuapp.com/gun',
-      'https://gun-relay.herokuapp.com/gun',
       'wss://gun-manhattan.herokuapp.com/gun'
     ];
-    
-    // Add fallback peers if we don't have enough
-    fallbackPeers.forEach(peer => {
-      if (!livePeers.includes(peer)) {
-        livePeers.push(peer);
-      }
-    });
-    
-    this.livePeers = livePeers;
-    console.log('Discovered', livePeers.length, 'total peers:', livePeers);
+
+    this.livePeers = knownPeers;
+    console.log('Using', knownPeers.length, 'Gun.js peers');
   }
 
   private startPeerDiscovery(): void {
-    // Rediscover peers every 3 minutes
+    // Rediscover peers every 5 minutes
     this.peerDiscoveryInterval = setInterval(async () => {
       console.log('Rediscovering peers...');
       await this.discoverLivePeers();
       
       // Reconnect Gun with new peers if connection is poor
-      if (!this.gunConnected || this.livePeers.length > 10) {
+      if (!this.gunConnected) {
         console.log('Attempting to reconnect Gun with fresh peers...');
         await this.initializeGun();
       }
-    }, 3 * 60 * 1000);
+    }, 5 * 60 * 1000);
   }
 
   private startConnectionMonitoring(): void {
@@ -674,18 +593,6 @@ class MessagingService {
       if (!this.gunConnected) {
         console.log('Connection lost, attempting to reconnect...');
         await this.initializeGun();
-      } else {
-        // Test connection by trying to write a heartbeat
-        try {
-          const testData = {
-            heartbeat: Date.now(),
-            user: this.userAddress
-          };
-          this.gun.get('kraken_heartbeat').get(this.userAddress).put(testData);
-        } catch (error) {
-          console.warn('Connection test failed:', error);
-          this.gunConnected = false;
-        }
       }
     }, 30000);
   }
@@ -728,77 +635,36 @@ class MessagingService {
         }
       }
       
-      // Initialize Gun with discovered live peers and optimized settings
+      // Initialize Gun with discovered live peers
       this.gun = Gun({
         peers: this.livePeers,
         localStorage: false,
         radisk: false,
-        retry: 10, // Reduced retry attempts
-        timeout: 15000, // Reduced timeout
-        wait: 1000, // Reduced wait time
-        chunk: 1000 * 8, // Smaller chunks for better reliability
-        until: 200, // Faster response expectation
-        multicast: false // Disable multicast for better reliability
+        retry: 5,
+        timeout: 10000,
+        wait: 1000,
+        chunk: 1000 * 8,
+        until: 200,
+        multicast: false
       });
 
-      // Get SEA for authentication
-      this.sea = Gun.SEA;
+      // Test Gun connection
+      const testData = { 
+        test: Date.now(),
+        user: this.userAddress,
+        timestamp: new Date().toISOString()
+      };
       
-      // Test Gun connection with multiple attempts
-      let connectionAttempts = 0;
-      const maxAttempts = 3;
-      
-      while (connectionAttempts < maxAttempts && !this.gunConnected) {
-        connectionAttempts++;
-        console.log(`Gun.js connection attempt ${connectionAttempts}/${maxAttempts}`);
-        
-        await new Promise((resolve) => {
-          const timeout = setTimeout(() => {
-            console.warn(`Gun.js connection attempt ${connectionAttempts} timeout`);
-            resolve(null);
-          }, 10000);
-
-          // Test Gun connection with a simple write/read
-          const testKey = `test-${this.userAddress}-${Date.now()}`;
-          const testData = { 
-            test: Date.now(),
-            user: this.userAddress,
-            timestamp: new Date().toISOString(),
-            attempt: connectionAttempts
-          };
-          
-          // Try to write data
-          this.gun.get('kraken_test').get(testKey).put(testData, (ack: any) => {
-            if (ack.err) {
-              console.warn(`Gun.js test write failed (attempt ${connectionAttempts}):`, ack.err);
-            } else {
-              console.log(`Gun.js test write successful (attempt ${connectionAttempts})`);
-              
-              // Try to read back the data
-              this.gun.get('kraken_test').get(testKey).once((data: any) => {
-                if (data && data.test === testData.test) {
-                  console.log(`Gun.js connected and verified successfully (attempt ${connectionAttempts})`);
-                  this.gunConnected = true;
-                  clearTimeout(timeout);
-                  resolve(ack);
-                } else {
-                  console.warn(`Gun.js read verification failed (attempt ${connectionAttempts})`);
-                }
-              });
-            }
-          });
-        });
-        
-        if (!this.gunConnected && connectionAttempts < maxAttempts) {
-          // Wait before next attempt
-          await new Promise(resolve => setTimeout(resolve, 2000));
+      // Try to write data
+      this.gun.get('kraken_test').get(`test-${this.userAddress}-${Date.now()}`).put(testData, (ack: any) => {
+        if (ack.err) {
+          console.warn('Gun.js test write failed:', ack.err);
+          this.gunConnected = false;
+        } else {
+          console.log('Gun.js connected successfully');
+          this.gunConnected = true;
         }
-      }
-      
-      if (!this.gunConnected) {
-        console.error('Failed to establish Gun.js connection after all attempts');
-        // Continue anyway with limited functionality
-      }
+      });
       
     } catch (error) {
       console.error('Gun.js initialization failed:', error);
@@ -814,7 +680,7 @@ class MessagingService {
 
     console.log('Setting up Gun.js message listeners for:', this.userAddress);
     
-    // Listen for messages addressed to this user with improved reliability
+    // Listen for messages addressed to this user
     this.gun.get('kraken_messages').get(this.userAddress).map().on(async (data: any, key: string) => {
       if (!data || !data.sender || data.sender === this.userAddress) return;
       
@@ -824,47 +690,10 @@ class MessagingService {
       }
       
       try {
-        console.log('Received message via Gun.js inbox:', data);
+        console.log('Received message via Gun.js:', data);
         await this.processReceivedMessage(data, 'gun');
       } catch (error) {
         console.error('Error processing Gun.js message:', error);
-      }
-    });
-
-    // Global message listener for broadcast messages
-    this.gun.get('kraken_global').map().on(async (data: any, key: string) => {
-      if (!data || !data.receiver || !data.sender || data.sender === this.userAddress) return;
-      
-      // Only process messages addressed to this user
-      if (data.receiver !== this.userAddress) return;
-      
-      // Skip if we already processed this message
-      if (this.processedMessageIds.has(data.id)) {
-        return;
-      }
-      
-      try {
-        console.log('Received global message via Gun.js:', data);
-        await this.processReceivedMessage(data, 'gun');
-      } catch (error) {
-        console.error('Error processing global Gun.js message:', error);
-      }
-    });
-
-    // Listen for direct messages using a more specific path
-    this.gun.get('kraken_direct').get(this.userAddress).map().on(async (data: any, key: string) => {
-      if (!data || !data.sender || data.sender === this.userAddress) return;
-      
-      // Skip if we already processed this message
-      if (this.processedMessageIds.has(data.id)) {
-        return;
-      }
-      
-      try {
-        console.log('Received direct message via Gun.js:', data);
-        await this.processReceivedMessage(data, 'gun');
-      } catch (error) {
-        console.error('Error processing direct Gun.js message:', error);
       }
     });
   }
@@ -903,7 +732,7 @@ class MessagingService {
           timestamp: data.timestamp,
           status: 'delivered',
           encrypted: true,
-          decrypted: true, // Mark as successfully decrypted
+          decrypted: true,
           transport
         };
       } catch (error) {
@@ -914,7 +743,7 @@ class MessagingService {
           id: data.id,
           sender: data.sender,
           receiver: data.receiver,
-          content: `Ephemeral Message: No Longer Available`,
+          content: `🔒 Encrypted message (decryption failed)`,
           encryptedContent: data.encryptedContent,
           iv: data.iv,
           timestamp: data.timestamp,
@@ -1067,83 +896,27 @@ class MessagingService {
       console.log('Sending unencrypted message via Gun.js to:', message.receiver);
     }
 
-    // Send to multiple paths for maximum reliability
-    const promises = [
-      // Send to receiver's inbox
-      new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('Gun.js send timeout (inbox)'));
-        }, 10000);
+    // Send to receiver's inbox
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Gun.js send timeout'));
+      }, 10000);
 
-        try {
-          this.gun.get('kraken_messages').get(message.receiver).get(message.id).put(messageData, (ack: any) => {
-            clearTimeout(timeout);
-            if (ack.err) {
-              reject(new Error('Gun.js send failed (inbox): ' + ack.err));
-            } else {
-              console.log('Message sent via Gun.js inbox to', message.receiver);
-              resolve(ack);
-            }
-          });
-        } catch (error) {
+      try {
+        this.gun.get('kraken_messages').get(message.receiver).get(message.id).put(messageData, (ack: any) => {
           clearTimeout(timeout);
-          reject(error);
-        }
-      }),
-      
-      // Send to global broadcast
-      new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('Gun.js send timeout (global)'));
-        }, 10000);
-
-        try {
-          this.gun.get('kraken_global').get(message.id).put(messageData, (ack: any) => {
-            clearTimeout(timeout);
-            if (ack.err) {
-              reject(new Error('Gun.js send failed (global): ' + ack.err));
-            } else {
-              console.log('Message sent via Gun.js global broadcast');
-              resolve(ack);
-            }
-          });
-        } catch (error) {
-          clearTimeout(timeout);
-          reject(error);
-        }
-      }),
-
-      // Send to direct message path
-      new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('Gun.js send timeout (direct)'));
-        }, 10000);
-
-        try {
-          this.gun.get('kraken_direct').get(message.receiver).get(message.id).put(messageData, (ack: any) => {
-            clearTimeout(timeout);
-            if (ack.err) {
-              reject(new Error('Gun.js send failed (direct): ' + ack.err));
-            } else {
-              console.log('Message sent via Gun.js direct path');
-              resolve(ack);
-            }
-          });
-        } catch (error) {
-          clearTimeout(timeout);
-          reject(error);
-        }
-      })
-    ];
-
-    // Wait for at least one to succeed
-    try {
-      await Promise.any(promises);
-      console.log('Message successfully sent via Gun.js to', message.receiver);
-    } catch (error) {
-      console.error('All Gun.js send attempts failed for message to', message.receiver);
-      throw new Error('All Gun.js send attempts failed');
-    }
+          if (ack.err) {
+            reject(new Error('Gun.js send failed: ' + ack.err));
+          } else {
+            console.log('Message sent via Gun.js to', message.receiver);
+            resolve(ack);
+          }
+        });
+      } catch (error) {
+        clearTimeout(timeout);
+        reject(error);
+      }
+    });
   }
 
   async sendMessage(content: string, receiver: string, encrypted: boolean = false): Promise<void> {
@@ -1212,9 +985,6 @@ class MessagingService {
       
       // Add to queue for retry instead of marking as failed
       this.messageQueue.push(message);
-      
-      // Don't throw the error - let the UI show the message as 'sending'
-      // The background retry will handle delivery
     }
   }
 

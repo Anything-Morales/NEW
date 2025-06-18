@@ -73,7 +73,7 @@ export function Layout() {
             active={false}
             onClick={handleProfileClick}
           />
-          <NavItem to="/wallet" icon={<Wallet />} label="Wallet" active={location.pathname === '/wallet'} />
+          <NavItem to="/wallet" icon={<Wallet />} label="Market" active={location.pathname === '/wallet'} />
           
           <button
             onClick={handleLogout}

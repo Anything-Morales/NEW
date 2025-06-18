@@ -1,7 +1,7 @@
 {
-  "name": "vite-react-typescript-starter",
+  "name": "kraken-messaging-app",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -21,11 +21,6 @@
     "date-fns": "^3.3.1",
     "gun": "^0.2020.1239",
     "lightweight-charts": "^4.1.3",
-    "react-query": "^3.39.3",
-    "web3.storage": "^4.5.5",
-    "viem": "^1.21.4",
-    "wagmi": "^1.4.13",
-    "socket.io-client": "^4.7.4",
     "zustand": "^4.5.1"
   },
   "devDependencies": {

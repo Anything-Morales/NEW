@@ -3,12 +3,10 @@ import { createChart, ColorType, IChartApi } from 'lightweight-charts';
 import { 
   ArrowUpRight, 
   ArrowDownRight, 
-  DollarSign,
   BarChart3,
   RefreshCcw,
   Clock,
   TrendingUp,
-  Sparkles,
   AlertCircle,
   Shield,
   CheckCircle2,
@@ -154,7 +152,7 @@ export function Wallet() {
 
   const fetchGlobalStats = async () => {
     try {
-      setApiError(null); // Reset error state
+      setApiError(null);
       const response = await fetch('https://api.coingecko.com/api/v3/global');
       
       if (!response.ok) {
@@ -170,13 +168,13 @@ export function Wallet() {
       });
     } catch (error) {
       console.error('Error fetching global stats:', error);
-      setApiError('Failed to load market data. Please check your internet connection or try again later.');
+      setApiError('Failed to load market data. Please check your internet connection.');
     }
   };
 
   const fetchCryptoData = async () => {
     try {
-      setApiError(null); // Reset error state
+      setApiError(null);
       const response = await fetch(
         'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=20&sparkline=false&price_change_percentage=24h'
       );
@@ -190,7 +188,7 @@ export function Wallet() {
       setLoading(false);
     } catch (error) {
       console.error('Error fetching crypto data:', error);
-      setApiError('Failed to load cryptocurrency data. Please check your internet connection or try again later.');
+      setApiError('Failed to load cryptocurrency data. Please check your internet connection.');
       setLoading(false);
     }
   };
@@ -221,7 +219,6 @@ export function Wallet() {
       setChartData(processedData);
     } catch (error) {
       console.error('Error fetching chart data:', error);
-      // Chart data errors are less critical, so we don't set the main apiError
     }
   };
 
@@ -276,11 +273,6 @@ export function Wallet() {
             <div className="flex-1">
               <h3 className="text-red-400 font-semibold mb-2">Connection Error</h3>
               <p className="text-red-300/90 mb-4">{apiError}</p>
-              <div className="space-y-2 text-sm text-red-300/80 mb-4">
-                <p>• Check your internet connection</p>
-                <p>• Disable ad-blockers or browser extensions that might block API requests</p>
-                <p>• The CoinGecko API might be temporarily unavailable</p>
-              </div>
               <button
                 onClick={handleRetry}
                 className="bg-red-500/20 hover:bg-red-500/30 text-red-300 px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
@@ -496,7 +488,7 @@ export function Wallet() {
             )}
           </div>
 
-          {/* FIU Compliance Notice */}
+          {/* Compliance Notice */}
           <div className="bg-gradient-to-br from-amber-500/5 to-amber-600/10 rounded-lg overflow-hidden">
             <div className="p-6 backdrop-blur-sm border border-amber-500/20">
               <div className="flex items-start space-x-4">
@@ -506,89 +498,30 @@ export function Wallet() {
                 <div className="space-y-3">
                   <h3 className="text-amber-400 font-bold text-lg flex items-center">
                     <Shield className="w-5 h-5 mr-2" />
-                    FIU Compliance Notice
+                    Market Data Only
                   </h3>
                   <p className="text-amber-200/90 leading-relaxed">
                     This cryptocurrency market viewer is for informational purposes only. Trading and investment 
-                    features are currently disabled to ensure compliance with Financial Intelligence Unit (FIU) 
-                    guidelines and regulatory requirements.
+                    features are not available to ensure compliance with financial regulations.
                   </p>
                   <div className="bg-amber-500/10 rounded-lg p-4 border border-amber-500/20">
-                    <h4 className="text-amber-300 font-semibold mb-2">Compliance Status:</h4>
+                    <h4 className="text-amber-300 font-semibold mb-2">Available Features:</h4>
                     <ul className="space-y-2 text-sm text-amber-200/80">
                       <li className="flex items-center">
                         <CheckCircle2 className="w-4 h-4 mr-2 text-amber-400" />
-                        Market data viewing - Enabled
+                        Real-time market data viewing
                       </li>
                       <li className="flex items-center">
-                        <Clock className="w-4 h-4 mr-2 text-amber-400" />
-                        Trading functionality - Under review
+                        <CheckCircle2 className="w-4 h-4 mr-2 text-amber-400" />
+                        Interactive price charts
                       </li>
                       <li className="flex items-center">
-                        <Clock className="w-4 h-4 mr-2 text-amber-400" />
-                        Wallet integration - Pending compliance
+                        <CheckCircle2 className="w-4 h-4 mr-2 text-amber-400" />
+                        Market statistics and analytics
                       </li>
                     </ul>
                   </div>
-                  <div className="flex items-center space-x-2 text-sm text-amber-400/80 pt-2">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Updates will be implemented following regulatory approval</span>
-                  </div>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Coming Soon Features */}
-          <div className="bg-zinc-900/50 backdrop-blur-sm rounded-lg p-6 border border-zinc-800/50 shadow-lg">
-            <div className="flex items-center space-x-3 mb-6">
-              <Sparkles className="w-6 h-6 text-blue-500" />
-              <h2 className="text-xl font-bold text-zinc-100">Coming Soon</h2>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="group relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <button disabled className="w-full bg-zinc-800/50 text-zinc-100 p-4 rounded-lg border border-zinc-700/50 flex items-center justify-between group-hover:border-blue-500/20 transition-colors">
-                  <div className="flex items-center space-x-3">
-                    <DollarSign className="w-5 h-5 text-blue-500" />
-                    <span>Portfolio Tracking</span>
-                  </div>
-                  <Clock className="w-4 h-4 text-zinc-500" />
-                </button>
-              </div>
-
-              <div className="group relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <button disabled className="w-full bg-zinc-800/50 text-zinc-100 p-4 rounded-lg border border-zinc-700/50 flex items-center justify-between group-hover:border-blue-500/20 transition-colors">
-                  <div className="flex items-center space-x-3">
-                    <TrendingUp className="w-5 h-5 text-blue-500" />
-                    <span>Price Alerts</span>
-                  </div>
-                  <Clock className="w-4 h-4 text-zinc-500" />
-                </button>
-              </div>
-
-              <div className="group relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <button disabled className="w-full bg-zinc-800/50 text-zinc-100 p-4 rounded-lg border border-zinc-700/50 flex items-center justify-between group-hover:border-blue-500/20 transition-colors">
-                  <div className="flex items-center space-x-3">
-                    <BarChart3 className="w-5 h-5 text-blue-500" />
-                    <span>Advanced Analytics</span>
-                  </div>
-                  <Clock className="w-4 h-4 text-zinc-500" />
-                </button>
-              </div>
-
-              <div className="group relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <button disabled className="w-full bg-zinc-800/50 text-zinc-100 p-4 rounded-lg border border-zinc-700/50 flex items-center justify-between group-hover:border-blue-500/20 transition-colors">
-                  <div className="flex items-center space-x-3">
-                    <Activity className="w-5 h-5 text-blue-500" />
-                    <span>Trading Interface</span>
-                  </div>
-                  <Clock className="w-4 h-4 text-zinc-500" />
-                </button>
               </div>
             </div>
           </div>
